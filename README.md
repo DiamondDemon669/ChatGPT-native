@@ -1,5 +1,5 @@
 # ChatGPT-native
-Native GUI frontend for ChatGPT. built using revChatGPT and customtkinter
+Lightweight native GUI frontend for ChatGPT. built using revChatGPT and customtkinter
 
 Depends on:
 - tkinter
