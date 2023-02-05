@@ -21,7 +21,7 @@ class app(ctk.CTk):
         self.entry_box = ctk.CTkEntry(self, placeholder_text="Put your message here", textvariable=self.entry_var, width=625, height=25)
         self.entry_box.grid(row=0, column=2, sticky="se", padx=5, pady=5)
         self.entry_box.bind("<Return>", self.send_message)
-        self.text_box = ctk.CTkTextbox(self, height=460, width=650)
+        self.text_box = ctk.CTkTextbox(self, height=460, width=650, font=ctk.CTkFont(family="ui-sans-serif", size=16))
         self.text_box.grid(row=0, column=1, sticky="nw", padx=5, pady=5, columnspan=2)
         self.text_box.configure(state="disabled")
         self.text_box.tag_config("tag-right", justify="right")
@@ -31,10 +31,12 @@ class app(ctk.CTk):
             self.entry_box.delete(0, tk.END)
             self.text_box.configure(state="normal")
             self.text_box.insert("end", "You:\n" + msg + '\n', "tag-right")
+            self.text_box.configure(state="disabled")
             try:
                 message = self.cb.ask(msg, conversation_id=self.cb.config.get("conversation"))
             except Exception as exc:
                 print(exc, message)
+            self.text_box.configure(state="normal")
             self.text_box.insert("end", "ChatGPT:\n" + message["message"] + '\n')
             self.text_box.yview(tk.END)
             self.text_box.configure(state="disabled")
@@ -85,11 +87,13 @@ class app_frame(ctk.CTkFrame):
                      self.master.load_msg_history(x.get("id"))
                 )
             )
-            newbutton = ctk.CTkButton(self, text=x.get("title"), image=chat_image, width=180, height=40, command=newcommand)
+            newbutton = app_button(self, text=x.get("title"), image=chat_image, width=180, height=40, command=newcommand, iter=x)
             if len(self.conv_buttons) > 0:
                 newbutton.grid(row=self.conv_buttons[-1].grid_info()["row"] + 1, column=0, sticky="nw", padx=10, pady=5)
             else:
                 newbutton.grid(row=0, column=0, sticky="nw", padx=10, pady=5)
+            newbutton.bind("<Enter>", newbutton.enter_grid)
+            newbutton.bind("<Leave>", newbutton.leave_grid)
             self.conv_buttons.append(newbutton)
         for x in menu_buttons:
             if x.grid_info() == {}:
@@ -99,7 +103,33 @@ class app_frame(ctk.CTkFrame):
             self.rowconfigure(row + len(self.conv_buttons), weight=1)
             x.grid(row=row + len(self.conv_buttons), column=0, sticky="s", padx=10, pady=10)
 
+class app_button(ctk.CTkButton):
+    def __init__(self, *args, **kwargs):
+        iter = kwargs["iter"]
+        del kwargs["iter"]
+        super().__init__(*args, **kwargs)
+        title_dialog = (lambda w, cb, iter:
+            cb.change_title(iter.get("id"), ctk.CTkInputDialog(text="Enter new title:", title="Title").get_input())
+        )
+        self.change_image = ctk.CTkImage(light_image=Image.open("./assets/change.ico"), dark_image=Image.open("./assets/change.ico"))
+        self.delete_image = ctk.CTkImage(light_image=Image.open("./assets/delete.ico"), dark_image=Image.open("./assets/delete.ico"))
+        self.change_command = (lambda self=self, cb=self.master.master.cb, x=iter: title_dialog(self, cb, x))
+        self.delete_command = (lambda self=self, cb=self.master.master.cb, x=iter: cb.delete_conversation(x.get("id")))
+        self.change_button = ctk.CTkButton(self, image=self.change_image, text='', width=20, height=20, command=self.change_command)
+        self.delete_button = ctk.CTkButton(self, image=self.delete_image, text='', width=20, height=20, command=self.delete_command)
+    def enter_grid(self, event=None):
+        self.change_button.grid(row=2, column=4, sticky='w', padx=10, pady=5)
+        self.delete_button.grid(row=2, column=4, sticky='e', padx=10, pady=5)
+    def leave_grid(self, event=None):
+        self.change_button.grid_forget()
+        self.delete_button.grid_forget()
+
 config = json.load(open("./config.json"))
-cb = Chatbot(config)
+if config.get("xvfb-enabled"):
+    from xvfbwrapper import Xvfb
+    with Xvfb() as xvfb:
+        cb = Chatbot(config)
+else:
+    cb = Chatbot(config)
 w = app(cb)
 w.mainloop()
